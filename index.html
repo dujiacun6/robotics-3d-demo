@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>机器人学空间描述与连杆坐标系教学演示</title>
+<style>
+/* ===== CSS Variables ===== */
+:root {
+  --bg: #1a1a2e;
+  --panel-bg: rgba(26, 26, 46, 0.92);
+  --card-bg: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #e0e0e0;
+  --text-dim: #888;
+  --accent: #4fc3f7;
+  --accent2: #ff8a65;
+  --accent3: #81c784;
+  --red: #ef5350;
+  --green: #66bb6a;
+  --blue: #42a5f5;
+  --slider-track: rgba(255,255,255,0.15);
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ===== Layout ===== */
+#app { display: flex; height: 100vh; width: 100vw; }
+#canvas-container { flex: 1; position: relative; overflow: hidden; }
+#canvas-container canvas { display: block; }
+
+/* ===== Right Panel ===== */
+#panel {
+  width: 400px; min-width: 400px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  z-index: 10;
+}
+#panel::-webkit-scrollbar { width: 4px; }
+#panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Header */
+.panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.panel-header h1 { font-size: 16px; font-weight: 600; letter-spacing: 0.3px; }
+
+/* Language toggle */
+.lang-toggle {
+  display: flex; gap: 2px;
+  background: var(--card-bg);
+  border-radius: 6px; padding: 2px;
+}
+.lang-btn {
+  padding: 4px 10px; border: none; background: transparent;
+  color: var(--text-dim); cursor: pointer; border-radius: 4px;
+  font-size: 12px; transition: all 0.2s;
+}
+.lang-btn.active { background: var(--accent); color: #000; font-weight: 600; }
+
+/* Tabs */
+.tab-bar {
+  display: flex; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab-btn {
+  flex: 1; padding: 12px; border: none; background: transparent;
+  color: var(--text-dim); cursor: pointer; font-size: 13px;
+  transition: all 0.2s; position: relative;
+}
+.tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.tab-btn.active { color: var(--accent); }
+.tab-btn.active::after {
+  content: ''; position: absolute; bottom: 0; left: 20%; right: 20%;
+  height: 2px; background: var(--accent); border-radius: 1px;
+}
+
+/* Tab Content */
+.tab-content { display: none; flex: 1; padding: 16px 20px; }
+.tab-content.active { display: block; }
+
+/* Section */
+.section { margin-bottom: 18px; }
+.section-title {
+  font-size: 12px; text-transform: uppercase; color: var(--text-dim);
+  letter-spacing: 0.8px; margin-bottom: 10px; font-weight: 500;
+}
+
+/* Control rows */
+.control-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.control-row label {
+  font-size: 13px; min-width: 50px; color: var(--text);
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+.control-row input[type="range"] {
+  flex: 1; -webkit-appearance: none; height: 4px;
+  background: var(--slider-track); border-radius: 2px; outline: none;
+}
+.control-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--accent); cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.2);
+}
+.control-row .value {
+  font-size: 12px; color: var(--accent); font-family: monospace;
+  min-width: 36px; text-align: right;
+}
+.axis-x input[type="range"]::-webkit-slider-thumb { background: var(--red); }
+.axis-y input[type="range"]::-webkit-slider-thumb { background: var(--green); }
+.axis-z input[type="range"]::-webkit-slider-thumb { background: var(--blue); }
+
+/* Matrix display */
+.matrix-display {
+  background: var(--card-bg); border-radius: 8px; padding: 12px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 13px; line-height: 1.6;
+  border: 1px solid var(--border); overflow-x: auto;
+  white-space: pre; text-align: center;
+}
+.matrix-label {
+  font-size: 11px; color: var(--text-dim); text-align: center;
+  margin-bottom: 6px; font-family: inherit;
+}
+
+/* DH Table */
+.dh-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  margin-top: 8px;
+}
+.dh-table th {
+  padding: 6px 8px; border: 1px solid var(--border);
+  background: var(--card-bg); color: var(--text-dim);
+  font-weight: 500; font-family: 'Times New Roman', serif; font-style: italic;
+}
+.dh-table td {
+  padding: 6px 8px; border: 1px solid var(--border);
+  text-align: center; font-family: monospace;
+}
+.dh-table .highlight { color: var(--accent2); font-weight: 600; }
+
+/* Step Guide */
+.step-guide {
+  background: var(--card-bg); border-radius: 8px;
+  padding: 12px; margin-bottom: 12px;
+  border: 1px solid var(--border); min-height: 60px;
+}
+.step-number {
+  font-size: 11px; color: var(--accent); font-weight: 600;
+  margin-bottom: 4px;
+}
+.step-text { font-size: 13px; line-height: 1.5; }
+.step-nav { display: flex; gap: 8px; margin-top: 10px; }
+
+/* Buttons */
+.btn {
+  padding: 8px 16px; border: none; border-radius: 6px;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-primary { background: var(--accent); color: #000; }
+.btn-primary:hover { background: #5fcdf7; transform: translateY(-1px); }
+.btn-secondary { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: rgba(255,255,255,0.1); }
+.btn-small { padding: 6px 12px; font-size: 12px; }
+
+/* Info box */
+.info-box {
+  background: rgba(79, 195, 247, 0.1);
+  border: 1px solid rgba(79, 195, 247, 0.3);
+  border-radius: 6px; padding: 8px 12px; font-size: 12px;
+  margin-bottom: 10px; color: var(--accent);
+}
+
+/* Guide overlay */
+#guide-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.4s;
+}
+#guide-overlay.hidden { opacity: 0; pointer-events: none; }
+.guide-card {
+  background: var(--panel-bg); border: 1px solid var(--border);
+  border-radius: 16px; padding: 32px; max-width: 480px;
+  box-shadow: var(--shadow);
+}
+.guide-card h2 { font-size: 20px; margin-bottom: 12px; }
+.guide-card p { font-size: 14px; line-height: 1.6; color: var(--text-dim); margin-bottom: 8px; }
+.guide-card .key {
+  display: inline-block; padding: 2px 8px; background: var(--card-bg);
+  border-radius: 4px; font-family: monospace; font-size: 12px;
+  border: 1px solid var(--border);
+}
+
+/* Legend */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.legend-dot {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* Responsive */
+@media (max-width: 860px) {
+  #app { flex-direction: column; }
+  #panel { width: 100%; min-width: unset; max-height: 45vh; border-left: none; border-top: 1px solid var(--border); }
+}
+
+/* Toast / Status */
+.status-bar {
+  position: absolute; bottom: 16px; left: 16px;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+  padding: 6px 14px; border-radius: 20px;
+  font-size: 12px; color: var(--text-dim);
+  pointer-events: none;
+}
+
+/* Coordinates label in 3D */
+.coord-label {
+  color: #fff; font-size: 12px; font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- 3D Canvas -->
+  <div id="canvas-container">
+    <div class="status-bar" id="statusBar">拖拽旋转 · 滚轮缩放</div>
+  </div>
+
+  <!-- Right Panel -->
+  <div id="panel">
+    <!-- Header -->
+    <div class="panel-header">
+      <h1 id="panelTitle">🤖 机器人学教学演示</h1>
+      <div class="lang-toggle">
+        <button class="lang-btn active" data-lang="zh" onclick="setLanguage('zh')">中</button>
+        <button class="lang-btn" data-lang="en" onclick="setLanguage('en')">EN</button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="space" onclick="switchTab('space')">空间描述</button>
+      <button class="tab-btn" data-tab="dh" onclick="switchTab('dh')">连杆坐标系</button>
+    </div>
+
+    <!-- Tab: 空间描述 -->
+    <div class="tab-content active" id="tab-space">
+      <!-- Info -->
+      <div class="info-box" id="spaceInfo">探索 3D 空间中的位置、姿态与坐标变换</div>
+
+      <!-- Point Position -->
+      <div class="section">
+        <div class="section-title">📌 点位置</div>
+        <div class="control-row axis-x">
+          <label>X</label>
+          <input type="range" id="pointX" min="-5" max="5" step="0.1" value="2">
+          <span class="value" id="pointXVal">2.0</span>
+        </div>
+        <div class="control-row axis-y">
+          <label>Y</label>
+          <input type="range" id="pointY" min="-5" max="5" step="0.1" value="1.5">
+          <span class="value" id="pointYVal">1.5</span>
+        </div>
+        <div class="control-row axis-z">
+          <label>Z</label>
+          <input type="range" id="pointZ" min="-5" max="5" step="0.1" value="1">
+          <span class="value" id="pointZVal">1.0</span>
+        </div>
+      </div>
+
+      <!-- Rotation -->
+      <div class="section">
+        <div class="section-title">🔄 姿态旋转</div>
+        <div class="control-row axis-x">
+          <label>Rx</label>
+          <input type="range" id="rotX" min="-180" max="180" step="1" value="30">
+          <span class="value" id="rotXVal">30°</span>
+        </div>
+        <div class="control-row axis-y">
+          <label>Ry</label>
+          <input type="range" id="rotY" min="-180" max="180" step="1" value="45">
+          <span class="value" id="rotYVal">45°</span>
+        </div>
+        <div class="control-row axis-z">
+          <label>Rz</label>
+          <input type="range" id="rotZ" min="-180" max="180" step="1" value="0">
+          <span class="value" id="rotZVal">0°</span>
+        </div>
+        <div style="display:flex;gap:8px;margin:8px 0;">
+          <button class="btn btn-small btn-secondary" id="rotModeBtn" onclick="toggleRotMode()">模式: 固定角</button>
+          <button class="btn btn-small btn-secondary" onclick="resetRotation()">重置</button>
+        </div>
+        <div class="matrix-label">旋转矩阵 R (3×3)</div>
+        <div class="matrix-display" id="rotMatrixDisplay">1.000  0.000  0.000
+0.000  1.000  0.000
+0.000  0.000  1.000</div>
+      </div>
+
+      <!-- Translation -->
+      <div class="section">
+        <div class="section-title">📐 齐次变换矩阵 T (4×4)</div>
+        <div class="matrix-display" id="transformMatrixDisplay">1.000  0.000  0.000  2.000
+0.000  1.000  0.000  1.500
+0.000  0.000  1.000  1.000
+0.000  0.000  0.000  1.000</div>
+      </div>
+
+      <!-- Legend -->
+      <div class="section">
+        <div class="section-title">🎨 图例</div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>X 轴</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Y 轴</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>Z 轴</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#ffd54f"></span>目标点</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#4dd0e1"></span>旋转坐标系</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: 连杆坐标系 DH -->
+    <div class="tab-content" id="tab-dh">
+      <div class="info-box" id="dhInfo">按照 DH 参数法逐步建立连杆坐标系</div>
+
+      <!-- Step Guide -->
+      <div class="step-guide" id="stepGuide">
+        <div class="step-number" id="stepNumber">步骤 0 / 4</div>
+        <div class="step-text" id="stepText">点击"开始引导"逐步建立坐标系</div>
+        <div class="step-nav">
+          <button class="btn btn-small btn-secondary" id="stepPrev" onclick="stepPrev()" disabled>← 上一步</button>
+          <button class="btn btn-small btn-primary" id="stepNextBtn" onclick="stepNext()">开始引导 →</button>
+        </div>
+      </div>
+
+      <!-- Joint Angles -->
+      <div class="section">
+        <div class="section-title">🔧 关节角度</div>
+        <div class="control-row axis-x">
+          <label>θ₁</label>
+          <input type="range" id="joint1" min="-90" max="90" step="1" value="30">
+          <span class="value" id="joint1Val">30°</span>
+        </div>
+        <div class="control-row axis-y">
+          <label>θ₂</label>
+          <input type="range" id="joint2" min="-90" max="90" step="1" value="-20">
+          <span class="value" id="joint2Val">-20°</span>
+        </div>
+        <div>
+          <button class="btn btn-small btn-secondary" id="autoRotateBtn" onclick="toggleAutoRotate()">▶ 自动旋转</button>
+        </div>
+      </div>
+
+      <!-- Link Lengths -->
+      <div class="section">
+        <div class="section-title">📏 连杆长度</div>
+        <div class="control-row axis-z">
+          <label>a₁</label>
+          <input type="range" id="linkLen1" min="0.5" max="3.0" step="0.1" value="2.0">
+          <span class="value" id="linkLen1Val">2.0</span>
+        </div>
+        <div class="control-row axis-x">
+          <label>a₂</label>
+          <input type="range" id="linkLen2" min="0.5" max="3.0" step="0.1" value="1.5">
+          <span class="value" id="linkLen2Val">1.5</span>
+        </div>
+        <div class="control-row axis-y">
+          <label>d₁</label>
+          <input type="range" id="linkOff1" min="0.2" max="1.5" step="0.1" value="0.5">
+          <span class="value" id="linkOff1Val">0.5</span>
+        </div>
+      </div>
+
+      <!-- DH Parameters -->
+      <div class="section">
+        <div class="section-title">📊 DH 参数</div>
+        <table class="dh-table">
+          <thead>
+            <tr><th>i</th><th>a<sub>i</sub></th><th>α<sub>i</sub></th><th>d<sub>i</sub></th><th>θ<sub>i</sub></th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td id="dhA1">2.0</td><td>90°</td><td id="dhD1">0.5</td><td class="highlight" id="dhTheta1">30°</td></tr>
+            <tr><td>2</td><td id="dhA2">1.5</td><td>0°</td><td>0</td><td class="highlight" id="dhTheta2">-20°</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Legend -->
+      <div class="section">
+        <div class="section-title">🎨 图例</div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>X 轴</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Y 轴</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>Z 轴</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#ffd54f"></span>关节轴线</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#ce93d8"></span>公垂线</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Guide Overlay -->
+<div id="guide-overlay">
+  <div class="guide-card">
+    <h2 id="guideTitle">👋 欢迎！</h2>
+    <p id="guideDesc1">这是一个机器人学交互式 3D 教学工具，帮助你直观理解：</p>
+    <p id="guideDesc2">• <b>空间描述</b> — 点的位置、旋转矩阵、齐次变换</p>
+    <p id="guideDesc3">• <b>连杆坐标系</b> — DH 参数法逐步建立坐标系</p>
+    <p style="margin-top:12px;font-size:12px;color:var(--text-dim)" id="guideHint">🖱 拖拽旋转 · 滚轮缩放 · 右侧面板调节参数</p>
+    <button class="btn btn-primary" onclick="closeGuide()" style="margin-top:16px" id="guideBtn">开始学习 →</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============================================================
+// GLOBALS
+// ============================================================
+let scene, camera, renderer, controls;
+let animFrame;
+const DEG = Math.PI / 180;
+
+// Scene objects - Space tab
+let worldAxes, pointMesh, pointLabel, pointVector;
+let rotFrame; // the rotated coordinate frame
+let rotFrameGroup;
+
+// Scene objects - DH tab
+let dhGroup;
+let link1, link2, joint1Mesh, joint2Mesh;
+let dhAxes = [];
+let stepIndicator = null;
+let stepLines = [];
+
+// State
+let currentTab = 'space';
+let currentLang = 'zh';
+let rotMode = 'fixed'; // 'fixed' or 'euler'
+let dhStep = 0;
+let autoRotate = false;
+let autoRotateTime = 0;
+
+// Translations
+const i18n = {
+  zh: {
+    panelTitle: '🤖 机器人学教学演示',
+    statusBar: '拖拽旋转 · 滚轮缩放',
+    spaceInfo: '探索 3D 空间中的位置、姿态与坐标变换',
+    dhInfo: '按照 DH 参数法逐步建立连杆坐标系',
+    spaceTab: '空间描述',
+    dhTab: '连杆坐标系',
+    guideTitle: '👋 欢迎！',
+    guideDesc1: '这是一个机器人学交互式 3D 教学工具，帮助你直观理解：',
+    guideDesc2: '• <b>空间描述</b> — 点的位置、旋转矩阵、齐次变换',
+    guideDesc3: '• <b>连杆坐标系</b> — DH 参数法逐步建立坐标系',
+    guideHint: '🖱 拖拽旋转 · 滚轮缩放 · 右侧面板调节参数',
+    guideBtn: '开始学习 →',
+    rotModeFixed: '模式: 固定角',
+    rotModeEuler: '模式: 欧拉角',
+    step0: '点击"开始引导"逐步建立坐标系',
+    step1: '步骤 1：确定 Z<sub>i-1</sub> 和 Z<sub>i</sub> 轴 — 沿关节轴线方向',
+    step2: '步骤 2：确定原点 O<sub>i</sub> — Z<sub>i</sub> 与 Z<sub>i-1</sub> 公垂线与 Z<sub>i</sub> 的交点',
+    step3: '步骤 3：确定 X<sub>i</sub> 轴 — 沿公垂线方向，从 Z<sub>i-1</sub> 指向 Z<sub>i</sub>',
+    step4: '步骤 4：补全 Y<sub>i</sub> 轴 — 根据右手定则 Y<sub>i</sub> = Z<sub>i</sub> × X<sub>i</sub>',
+    startGuide: '开始引导 →',
+    nextStep: '下一步 →',
+    prevStep: '← 上一步',
+  },
+  en: {
+    panelTitle: '🤖 Robotics Teaching Demo',
+    statusBar: 'Drag to rotate · Scroll to zoom',
+    spaceInfo: 'Explore position, orientation, and coordinate transforms in 3D',
+    dhInfo: 'Build link coordinate systems step by step using DH parameters',
+    spaceTab: 'Space & Transform',
+    dhTab: 'Link Coords (DH)',
+    guideTitle: '👋 Welcome!',
+    guideDesc1: 'An interactive 3D teaching tool for robotics. Understand:',
+    guideDesc2: '• <b>Space Description</b> — position, rotation matrix, transformation',
+    guideDesc3: '• <b>Link Coordinates</b> — DH parameter method step by step',
+    guideHint: '🖱 Drag to rotate · Scroll to zoom · Adjust parameters on the right',
+    guideBtn: 'Let\'s Start →',
+    rotModeFixed: 'Mode: Fixed Angles',
+    rotModeEuler: 'Mode: Euler Angles',
+    step0: 'Click "Start Guide" to build coordinates step by step',
+    step1: 'Step 1: Identify Z<sub>i-1</sub> and Z<sub>i</sub> axes — along joint axes',
+    step2: 'Step 2: Locate origin O<sub>i</sub> — intersection of common perpendicular with Z<sub>i</sub>',
+    step3: 'Step 3: Determine X<sub>i</sub> axis — along common perpendicular from Z<sub>i-1</sub> to Z<sub>i</sub>',
+    step4: 'Step 4: Complete Y<sub>i</sub> axis — right-hand rule Y<sub>i</sub> = Z<sub>i</sub> × X<sub>i</sub>',
+    startGuide: 'Start Guide →',
+    nextStep: 'Next →',
+    prevStep: '← Previous',
+  }
+};
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  const container = document.getElementById('canvas-container');
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1a2e);
+
+  camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
+  camera.position.set(8, 6, 10);
+  camera.lookAt(0, 0, 0);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 3;
+  controls.maxDistance = 30;
+  controls.target.set(0, 0, 0);
+
+  // Lights
+  const ambient = new THREE.AmbientLight(0x404060, 0.5);
+  scene.add(ambient);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(10, 15, 10);
+  dirLight.castShadow = true;
+  scene.add(dirLight);
+  const fillLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+  fillLight.position.set(-5, 0, -5);
+  scene.add(fillLight);
+
+  // Grid
+  const grid = new THREE.GridHelper(12, 12, 0x444488, 0x333366);
+  scene.add(grid);
+
+  // Build world axes
+  buildWorldAxes();
+  buildSpaceScene();
+  buildDHScene();
+
+  // Events
+  window.addEventListener('resize', onResize);
+  bindSliders();
+
+  // Start render
+  animate();
+
+  // Show DH scene hidden initially
+  dhGroup.visible = false;
+}
+
+// ============================================================
+// BUILD WORLD AXES
+// ============================================================
+function buildWorldAxes() {
+  worldAxes = new THREE.Group();
+  const len = 4;
+  const colors = [0xef5350, 0x66bb6a, 0x42a5f5];
+  const labels = ['X', 'Y', 'Z'];
+
+  for (let i = 0; i < 3; i++) {
+    const dir = new THREE.Vector3(i===0?1:0, i===1?1:0, i===2?1:0);
+    const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(0,0,0), len, colors[i], 0.3, 0.15);
+    worldAxes.add(arrow);
+  }
+  scene.add(worldAxes);
+}
+
+// ============================================================
+// BUILD SPACE SCENE
+// ============================================================
+function buildSpaceScene() {
+  // Point
+  const sphereGeo = new THREE.SphereGeometry(0.2, 24, 24);
+  const sphereMat = new THREE.MeshStandardMaterial({ color: 0xffd54f, emissive: 0xffd54f, emissiveIntensity: 0.2 });
+  pointMesh = new THREE.Mesh(sphereGeo, sphereMat);
+  pointMesh.castShadow = true;
+  scene.add(pointMesh);
+
+  // Point label (using sprite)
+  pointLabel = makeTextSprite('(2.0, 1.5, 1.0)', '#ffd54f');
+  pointLabel.position.copy(pointMesh.position);
+  pointLabel.position.y += 0.4;
+  scene.add(pointLabel);
+
+  // Vector from origin to point
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xffd54f, transparent: true, opacity: 0.4, dashed: true });
+  const lineGeo = new THREE.BufferGeometry();
+  const positions = new Float32Array([0,0,0, 2,1.5,1]);
+  lineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  pointVector = new THREE.Line(lineGeo, lineMat);
+  scene.add(pointVector);
+
+  // Rotated frame
+  rotFrameGroup = new THREE.Group();
+  const rotColors = [0xff7043, 0x69f0ae, 0x4dd0e1];
+  for (let i = 0; i < 3; i++) {
+    const dir = new THREE.Vector3(i===0?1:0, i===1?1:0, i===2?1:0);
+    const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(0,0,0), 2.5, rotColors[i], 0.25, 0.12);
+    rotFrameGroup.add(arrow);
+  }
+
+  // Frame label
+  const frameLabel = makeTextSprite('{B}', '#4dd0e1');
+  frameLabel.position.set(0, 0.3, 0);
+  rotFrameGroup.add(frameLabel);
+
+  rotFrameGroup.position.set(0, 0, 0);
+  scene.add(rotFrameGroup);
+}
+
+// ============================================================
+// BUILD DH SCENE
+// ============================================================
+function buildDHScene() {
+  dhGroup = new THREE.Group();
+
+  const linkMat1 = new THREE.MeshStandardMaterial({ color: 0x5c6bc0, roughness: 0.4, metalness: 0.3 });
+  const linkMat2 = new THREE.MeshStandardMaterial({ color: 0x7e57c2, roughness: 0.4, metalness: 0.3 });
+  const jointMat = new THREE.MeshStandardMaterial({ color: 0x90a4ae, roughness: 0.3, metalness: 0.6 });
+  const hingeMat = new THREE.MeshStandardMaterial({ color: 0xb0bec5, roughness: 0.2, metalness: 0.7 });
+
+  // ---- Base (fixed) ----
+  const baseGeo = new THREE.CylinderGeometry(0.5, 0.6, 0.3, 24);
+  const baseMesh = new THREE.Mesh(baseGeo, jointMat);
+  baseMesh.position.set(0, 0.15, 0);
+  baseMesh.castShadow = true;
+  dhGroup.add(baseMesh);
+
+  // ---- Joint 1 Hinge (base joint) ----
+  const j1Group = new THREE.Group();
+  // Outer ring
+  const ring1Geo = new THREE.TorusGeometry(0.35, 0.08, 12, 24);
+  const ring1 = new THREE.Mesh(ring1Geo, hingeMat);
+  ring1.position.set(0, 0.35, 0);
+  ring1.rotation.x = Math.PI / 2;
+  j1Group.add(ring1);
+  // Pin
+  const pin1Geo = new THREE.CylinderGeometry(0.08, 0.08, 0.3, 12);
+  const pin1 = new THREE.Mesh(pin1Geo, hingeMat);
+  pin1.position.set(0, 0.35, 0);
+  j1Group.add(pin1);
+  dhGroup.add(j1Group);
+
+  // ---- Link 1 (rotates by t1 about Y at origin) ----
+  const l1Group = new THREE.Group();
+
+  // Vertical shaft (d1 offset along Z)
+  const shaft1Geo = new THREE.CylinderGeometry(0.08, 0.08, 1.0, 10);
+  const shaft1 = new THREE.Mesh(shaft1Geo, linkMat1);
+  shaft1.position.set(0, 0.5, 0);
+  l1Group.add(shaft1);
+
+  // Horizontal arm (a1 along X)
+  const arm1Geo = new THREE.BoxGeometry(2.0, 0.12, 0.12);
+  const arm1 = new THREE.Mesh(arm1Geo, linkMat1);
+  arm1.position.set(1.0, 1.0, 0);
+  arm1.castShadow = true;
+  l1Group.add(arm1);
+
+  // Store mesh refs for dynamic length update
+  shaft1.userData.isShaft = true;
+  arm1.userData.isArm = true;
+  arm1.userData.linkIndex = 1;
+
+  // ---- Joint 2 Hinge ----
+  const j2Group = new THREE.Group();
+  // Outer ring
+  const ring2Geo = new THREE.TorusGeometry(0.3, 0.07, 12, 24);
+  const ring2 = new THREE.Mesh(ring2Geo, hingeMat);
+  ring2.rotation.x = Math.PI / 2;
+  j2Group.add(ring2);
+  // Pin
+  const pin2Geo = new THREE.CylinderGeometry(0.07, 0.07, 0.25, 12);
+  const pin2 = new THREE.Mesh(pin2Geo, hingeMat);
+  j2Group.add(pin2);
+  // Bracket
+  const bracketGeo = new THREE.BoxGeometry(0.15, 0.15, 0.3);
+  const bracket = new THREE.Mesh(bracketGeo, hingeMat);
+  bracket.position.set(0, -0.15, 0);
+  j2Group.add(bracket);
+
+  j2Group.position.set(2.0, 1.0, 0); // at end of arm1
+  j2Group.userData.isJoint2 = true;
+  l1Group.add(j2Group);
+
+  l1Group.position.set(0, 0, 0);
+  link1 = l1Group;
+  dhGroup.add(l1Group);
+
+  // ---- Link 2 (attached to joint 2, rotates by t2) ----
+  const l2Group = new THREE.Group();
+
+  const arm2Geo = new THREE.BoxGeometry(1.5, 0.10, 0.10);
+  const arm2 = new THREE.Mesh(arm2Geo, linkMat2);
+  arm2.position.set(0.75, 0, 0);
+  arm2.castShadow = true;
+  arm2.userData.isArm = true;
+  arm2.userData.linkIndex = 2;
+  l2Group.add(arm2);
+
+  // End effector tip
+  const tipGeo = new THREE.SphereGeometry(0.12, 16, 16);
+  const tipMat = new THREE.MeshStandardMaterial({ color: 0xff8a65, emissive: 0xff8a65, emissiveIntensity: 0.3 });
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.position.set(1.5, 0, 0);
+  tip.userData.isTip = true;
+  l2Group.add(tip);
+
+  // Link2 is added as child of link1Group (not dhGroup) — this fixes the kinematic chain!
+  // But we need it to be at joint2's location in link1's frame
+  l2Group.position.set(2.0, 1.0, 0);
+  link2 = l2Group;
+  link1.add(l2Group);
+
+  // Joint axis indicators (subtle, semi-transparent)
+  const axisColor = 0xffd54f;
+  for (let i = 0; i < 2; i++) {
+    const cylA = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.025, 2.0, 8),
+      new THREE.MeshBasicMaterial({ color: axisColor, transparent: true, opacity: 0.15 })
+    );
+    cylA.position.set(0, 1.0, 0);
+    cylA.userData = { type: 'jointAxis', index: i };
+    // Z0 axis stays at origin in dhGroup, Z1 follows link1 rotation
+    if (i === 0) {
+      dhGroup.add(cylA);
+    } else {
+      link1.add(cylA);
+      cylA.position.set(2.0, 1.0, 0); // at joint2 position in link1 frame
+    }
+    dhAxes.push(cylA);
+  }
+
+  scene.add(dhGroup);
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function makeTextSprite(text, color = '#ffffff') {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 80;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'transparent';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.font = 'Bold 36px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)';
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = color;
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(1.5, 0.5, 1);
+  return sprite;
+}
+
+// ============================================================
+// UPDATE FUNCTIONS - Space Tab
+// ============================================================
+function updateSpaceScene() {
+  const px = parseFloat(document.getElementById('pointX').value);
+  const py = parseFloat(document.getElementById('pointY').value);
+  const pz = parseFloat(document.getElementById('pointZ').value);
+  const rx = parseFloat(document.getElementById('rotX').value) * DEG;
+  const ry = parseFloat(document.getElementById('rotY').value) * DEG;
+  const rz = parseFloat(document.getElementById('rotZ').value) * DEG;
+
+  // Update point
+  pointMesh.position.set(px, py, pz);
+  pointLabel.position.set(px, py + 0.4, pz);
+  updatePointLabel(`(${px.toFixed(1)}, ${py.toFixed(1)}, ${pz.toFixed(1)})`, '#ffd54f');
+
+  // Update vector
+  const pos = pointVector.geometry.attributes.position.array;
+  pos[3] = px; pos[4] = py; pos[5] = pz;
+  pointVector.geometry.attributes.position.needsUpdate = true;
+
+  // Update rotation frame
+  rotFrameGroup.position.set(px, py, pz);
+  if (rotMode === 'fixed') {
+    // Fixed angles: R = Rz * Ry * Rx (rotate about world axes in order X, Y, Z)
+    const euler = new THREE.Euler(rx, ry, rz, 'XYZ');
+    rotFrameGroup.quaternion.setFromEuler(euler);
+  } else {
+    // Euler angles: R = Rz * Ry * Rx (rotate about local axes in order Z, Y, X)
+    const euler = new THREE.Euler(rx, ry, rz, 'ZYX');
+    rotFrameGroup.quaternion.setFromEuler(euler);
+  }
+
+  // Update rotation matrix display
+  const q = rotFrameGroup.quaternion.clone();
+  const m = new THREE.Matrix4().makeRotationFromQuaternion(q);
+  const me = m.elements;
+  const R = [
+    [me[0], me[4], me[8]],
+    [me[1], me[5], me[9]],
+    [me[2], me[6], me[10]]
+  ];
+  const rotStr = R.map(row => row.map(v => v.toFixed(3).padStart(7)).join('  ')).join('\n');
+  document.getElementById('rotMatrixDisplay').textContent = rotStr;
+
+  // Update transformation matrix
+  const T = [
+    [me[0], me[4], me[8],  px],
+    [me[1], me[5], me[9],  py],
+    [me[2], me[6], me[10], pz],
+    [0,     0,     0,      1 ]
+  ];
+  const tStr = T.map(row => row.map(v => v.toFixed(3).padStart(7)).join('  ')).join('\n');
+  document.getElementById('transformMatrixDisplay').textContent = tStr;
+
+  // Update value displays
+  document.getElementById('pointXVal').textContent = px.toFixed(1);
+  document.getElementById('pointYVal').textContent = py.toFixed(1);
+  document.getElementById('pointZVal').textContent = pz.toFixed(1);
+  document.getElementById('rotXVal').textContent = `${document.getElementById('rotX').value}°`;
+  document.getElementById('rotYVal').textContent = `${document.getElementById('rotY').value}°`;
+  document.getElementById('rotZVal').textContent = `${document.getElementById('rotZ').value}°`;
+}
+
+function makeTextSpriteCanvas(text, color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 384;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = 'Bold 28px Consolas, Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = color;
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  return texture;
+}
+
+function updatePointLabel(text, color) {
+  if (!pointLabel) return;
+  if (pointLabel.material.map) pointLabel.material.map.dispose();
+  pointLabel.material.map = makeTextSpriteCanvas(text, color);
+  pointLabel.material.needsUpdate = true;
+}
+
+// ============================================================
+// UPDATE FUNCTIONS - DH Tab
+// ============================================================
+function updateDHScene() {
+  const t1 = parseFloat(document.getElementById('joint1').value) * DEG;
+  const t2 = parseFloat(document.getElementById('joint2').value) * DEG;
+  const a1 = parseFloat(document.getElementById('linkLen1').value);
+  const a2 = parseFloat(document.getElementById('linkLen2').value);
+  const d1 = parseFloat(document.getElementById('linkOff1').value);
+
+  // ===== Update Link 1 geometry =====
+  // Vertical shaft: height = d1
+  const shaft = link1.children.find(c => c.userData && c.userData.isShaft);
+  if (shaft) {
+    shaft.geometry.dispose();
+    shaft.geometry = new THREE.CylinderGeometry(0.08, 0.08, d1, 10);
+    shaft.position.set(0, d1 / 2, 0);
+  }
+
+  // Horizontal arm: length = a1
+  const arm1 = link1.children.find(c => c.userData && c.userData.isArm);
+  if (arm1) {
+    arm1.geometry.dispose();
+    arm1.geometry = new THREE.BoxGeometry(a1, 0.12, 0.12);
+    arm1.position.set(a1 / 2, d1, 0);
+  }
+
+  // Joint 2: position at end of arm1
+  const j2 = link1.children.find(c => c.userData && c.userData.isJoint2);
+  if (j2) {
+    j2.position.set(a1, d1, 0);
+  }
+
+  // Link 2: position follows joint 2
+  if (link2) {
+    link2.position.set(a1, d1, 0);
+    // Update arm2 geometry
+    const arm2 = link2.children.find(c => c.userData && c.userData.isArm);
+    if (arm2) {
+      arm2.geometry.dispose();
+      arm2.geometry = new THREE.BoxGeometry(a2, 0.10, 0.10);
+      arm2.position.set(a2 / 2, 0, 0);
+    }
+    // Update tip position
+    const tip = link2.children.find(c => c.userData && c.userData.isTip);
+    if (tip) {
+      tip.position.set(a2, 0, 0);
+    }
+  }
+
+  // ===== Joint rotations =====
+  link1.rotation.y = t1;
+  link2.rotation.y = t2;
+
+  // ===== Update joint axis indicators =====
+  dhAxes.forEach((ax, i) => {
+    if (i === 0) {
+      // Z0 stays at origin in dhGroup
+      ax.position.set(0, d1 / 2, 0);
+    } else {
+      // Z1 is in link1 frame, at joint2 position
+      ax.position.set(a1, d1, 0);
+    }
+  });
+
+  // ===== Update DH parameter display =====
+  const t1Deg = document.getElementById('joint1').value;
+  const t2Deg = document.getElementById('joint2').value;
+  document.getElementById('dhTheta1').textContent = `${t1Deg}°`;
+  document.getElementById('dhTheta2').textContent = `${t2Deg}°`;
+  document.getElementById('joint1Val').textContent = `${t1Deg}°`;
+  document.getElementById('joint2Val').textContent = `${t2Deg}°`;
+  document.getElementById('linkLen1Val').textContent = a1.toFixed(1);
+  document.getElementById('linkLen2Val').textContent = a2.toFixed(1);
+  document.getElementById('linkOff1Val').textContent = d1.toFixed(1);
+
+  // Update DH table with dynamic values (use IDs)
+  document.getElementById('dhA1').textContent = a1.toFixed(1);
+  document.getElementById('dhD1').textContent = d1.toFixed(1);
+  document.getElementById('dhA2').textContent = a2.toFixed(1);
+
+  // Update step visuals
+  updateDHStepVisuals();
+}
+
+function updateDHStepVisuals() {
+  // Remove old step indicators
+  if (stepIndicator) {
+    dhGroup.remove(stepIndicator);
+    stepIndicator = null;
+  }
+  stepLines.forEach(l => {
+    dhGroup.remove(l);
+    // Dispose geometries and materials
+    if (l.geometry) l.geometry.dispose();
+    if (l.material) l.material.dispose();
+  });
+  stepLines = [];
+
+  if (dhStep === 0) return;
+
+  const t1 = parseFloat(document.getElementById('joint1').value) * DEG;
+  const a1 = parseFloat(document.getElementById('linkLen1').value);
+  const d1 = parseFloat(document.getElementById('linkOff1').value);
+  // Joint 2 position in link1's frame
+  const p2Local = new THREE.Vector3(a1, d1, 0);
+  // Transform to world position considering link1 rotation
+  const p2 = p2Local.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), t1);
+
+  const Z_COLOR = 0xffd54f;
+  const X_COLOR = 0xce93d8;
+  const Y_COLOR = 0x81c784;
+  const WHITE = 0xffffff;
+
+  const zLen = 1.8;
+  const arrowLen = 1.2;
+
+  if (dhStep >= 1) {
+    // ===== STEP 1: Show Z_{i-1} and Z_i axes (joint axes) =====
+    // Z_{i-1} at origin — thick, bright line
+    const z0Start = new THREE.Vector3(0, -zLen/2 + 0.3, 0);
+    const z0End = new THREE.Vector3(0, zLen/2 + 0.3, 0);
+    const z0Line = makeThickLine(z0Start, z0End, Z_COLOR);
+    dhGroup.add(z0Line); stepLines.push(z0Line);
+
+    // Z_{i-1} arrow
+    const arrowZ0 = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), new THREE.Vector3(0, 0.3, 0), zLen, Z_COLOR, 0.3, 0.15);
+    dhGroup.add(arrowZ0); stepLines.push(arrowZ0);
+
+    // Z_i at joint 2 — thick, bright line
+    const z1Start = new THREE.Vector3(p2.x, p2.y - zLen/2, p2.z);
+    const z1End = new THREE.Vector3(p2.x, p2.y + zLen/2, p2.z);
+    const z1Line = makeThickLine(z1Start, z1End, Z_COLOR);
+    dhGroup.add(z1Line); stepLines.push(z1Line);
+
+    // Z_i arrow
+    const arrowZ1 = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), p2, zLen, Z_COLOR, 0.3, 0.15);
+    dhGroup.add(arrowZ1); stepLines.push(arrowZ1);
+
+    // Glowing ring around joint axes to highlight them
+    const ringMat = new THREE.MeshBasicMaterial({ color: Z_COLOR, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+    for (let i = 0; i < 2; i++) {
+      const center = i === 0 ? new THREE.Vector3(0, 0.3, 0) : new THREE.Vector3(p2.x, p2.y, p2.z);
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.5, 0.7, 32),
+        ringMat
+      );
+      ring.position.copy(center);
+      ring.rotation.x = -Math.PI / 2;
+      dhGroup.add(ring); stepLines.push(ring);
+    }
+
+    // Labels
+    const l1 = makeTextSprite('Z_{i-1}', '#ffd54f');
+    l1.position.set(0, 0.3 + zLen/2 + 0.4, 0);
+    dhGroup.add(l1); stepLines.push(l1);
+
+    const l2 = makeTextSprite('Z_i', '#ffd54f');
+    l2.position.set(p2.x, p2.y + zLen/2 + 0.4, p2.z);
+    dhGroup.add(l2); stepLines.push(l2);
+
+  }
+
+  if (dhStep >= 2) {
+    // ===== STEP 2: Show origin O_i at intersection =====
+    // White sphere at origin
+    const originSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.15, 20, 20),
+      new THREE.MeshBasicMaterial({ color: WHITE })
+    );
+    originSphere.position.copy(p2);
+    stepIndicator = originSphere;
+    dhGroup.add(originSphere);
+
+    // Pulsing glow ring around origin
+    const glowRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.2, 0.35, 24),
+      new THREE.MeshBasicMaterial({ color: WHITE, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+    );
+    glowRing.position.copy(p2);
+    glowRing.rotation.x = -Math.PI / 2;
+    dhGroup.add(glowRing); stepLines.push(glowRing);
+
+    // Origin label
+    const ol = makeTextSprite('O_i', '#ffffff');
+    ol.position.set(p2.x, p2.y - 0.5, p2.z);
+    dhGroup.add(ol); stepLines.push(ol);
+
+    // Show common perpendicular direction (dashed line from Z_{i-1} axis to Z_i axis)
+    const perpMat = new THREE.LineDashedMaterial({
+      color: 0xce93d8, dashSize: 0.08, gapSize: 0.06, transparent: true, opacity: 0.5
+    });
+    const perpGeo = new THREE.BufferGeometry();
+    const fromPt = new THREE.Vector3(0, 0.3, 0);
+    const toPt = new THREE.Vector3(p2.x, 0.3, 0);
+    const perpPos = new Float32Array([fromPt.x, fromPt.y, fromPt.z, toPt.x, toPt.y, toPt.z]);
+    perpGeo.setAttribute('position', new THREE.BufferAttribute(perpPos, 3));
+    const perpLine = new THREE.Line(perpGeo, perpMat);
+    perpLine.computeLineDistances();
+    dhGroup.add(perpLine); stepLines.push(perpLine);
+
+    // Label for common perpendicular
+    const perpLabel = makeTextSprite('公垂线 a_i', '#ce93d8');
+    perpLabel.position.set((fromPt.x + toPt.x) / 2, fromPt.y - 0.4, 0);
+    dhGroup.add(perpLabel); stepLines.push(perpLabel);
+  }
+
+  if (dhStep >= 3) {
+    // ===== STEP 3: Show X_i axis along common perpendicular =====
+    const dir = new THREE.Vector3(p2.x, 0, p2.z).normalize();
+    if (dir.length() < 0.01) dir.set(1, 0, 0);
+
+    // X_i arrow from origin along the common perpendicular
+    const arrowX = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0.3, 0), arrowLen, X_COLOR, 0.3, 0.15);
+    dhGroup.add(arrowX); stepLines.push(arrowX);
+
+    // Extra ring highlight around X axis
+    const xRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.15, 0.25, 20),
+      new THREE.MeshBasicMaterial({ color: X_COLOR, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+    );
+    const xEndPos = dir.clone().multiplyScalar(arrowLen);
+    xRing.position.set(xEndPos.x, 0.3, xEndPos.z);
+    xRing.rotation.x = -Math.PI / 2;
+    dhGroup.add(xRing); stepLines.push(xRing);
+
+    // X_i label
+    const xl = makeTextSprite('X_i', '#ce93d8');
+    const xLabelPos = dir.clone().multiplyScalar(arrowLen + 0.4);
+    xl.position.set(xLabelPos.x, 0.3, xLabelPos.z);
+    dhGroup.add(xl); stepLines.push(xl);
+  }
+
+  if (dhStep >= 4) {
+    // ===== STEP 4: Complete Y_i using right-hand rule =====
+    // Y_i = Z_i × X_i
+    const zDir = new THREE.Vector3(0, 1, 0);
+    const xDir = new THREE.Vector3(p2.x, 0, p2.z).normalize();
+    if (xDir.length() < 0.01) xDir.set(1, 0, 0);
+    const yDir = new THREE.Vector3().crossVectors(zDir, xDir).normalize();
+
+    const yLen = 1.2;
+    const arrowY = new THREE.ArrowHelper(yDir, p2, yLen, Y_COLOR, 0.3, 0.15);
+    dhGroup.add(arrowY); stepLines.push(arrowY);
+
+    // Y_i label
+    const yl = makeTextSprite('Y_i', '#81c784');
+    const yPos = p2.clone().add(yDir.clone().multiplyScalar(yLen + 0.4));
+    yl.position.copy(yPos);
+    dhGroup.add(yl); stepLines.push(yl);
+
+    // Show right-hand rule indicator (curved arrow)
+    const curvePoints = [];
+    for (let t = 0; t <= Math.PI / 2; t += 0.05) {
+      const r = 0.5;
+      curvePoints.push(new THREE.Vector3(
+        p2.x + r * Math.cos(t),
+        0.3 + r * Math.sin(t),
+        p2.z
+      ));
+    }
+    const curveGeo = new THREE.BufferGeometry().setFromPoints(curvePoints);
+    const curveLine = new THREE.Line(curveGeo, new THREE.LineBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0.3
+    }));
+    dhGroup.add(curveLine); stepLines.push(curveLine);
+
+    // Label showing the cross product
+    const cpLabel = makeTextSprite('Y_i = Z_i × X_i', '#81c784');
+    cpLabel.position.set(p2.x - 0.5, p2.y - 0.8, p2.z);
+    dhGroup.add(cpLabel); stepLines.push(cpLabel);
+  }
+}
+
+function makeThickLine(from, to, color) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array([from.x, from.y, from.z, to.x, to.y, to.z]);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  return new THREE.Line(geo, new THREE.LineBasicMaterial({ color, linewidth: 1 }));
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+window.switchTab = function(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tab}`));
+
+  // Toggle visibility of tab-specific 3D objects
+  const spaceObjects = [pointMesh, pointLabel, pointVector, rotFrameGroup];
+  if (tab === 'space') {
+    dhGroup.visible = false;
+    spaceObjects.forEach(obj => { if (obj) obj.visible = true; });
+    // Reset step guide when switching to DH tab
+    if (dhStep > 0) { dhStep = 0; updateStepUI(); updateDHScene(); }
+  } else {
+    dhGroup.visible = true;
+    spaceObjects.forEach(obj => { if (obj) obj.visible = false; });
+    // Reset step guide when entering DH tab
+    dhStep = 0; updateStepUI(); updateDHScene();
+  }
+  updateStatusBar();
+}
+
+// ============================================================
+// STEP GUIDE
+// ============================================================
+window.stepNext = function() {
+  if (dhStep < 4) {
+    dhStep++;
+    updateStepUI();
+    updateDHScene();
+  }
+}
+
+window.stepPrev = function() {
+  if (dhStep > 0) {
+    dhStep--;
+    updateStepUI();
+    updateDHScene();
+  }
+}
+
+function updateStepUI() {
+  const lang = currentLang;
+  const t = i18n[lang];
+  document.getElementById('stepNumber').textContent = `${lang === 'zh' ? '步骤' : 'Step'} ${dhStep} / 4`;
+  const stepTexts = [t.step0, t.step1, t.step2, t.step3, t.step4];
+  document.getElementById('stepText').innerHTML = stepTexts[dhStep];
+  document.getElementById('stepPrev').disabled = dhStep === 0;
+  const nextBtn = document.getElementById('stepNextBtn');
+  if (dhStep === 0) {
+    nextBtn.textContent = t.startGuide;
+  } else if (dhStep < 4) {
+    nextBtn.textContent = t.nextStep;
+  } else {
+    nextBtn.textContent = '✓ ' + (lang === 'zh' ? '完成' : 'Done');
+  }
+  if (dhStep === 0) {
+    // Hide all step visuals
+    if (stepIndicator) { dhGroup.remove(stepIndicator); stepIndicator = null; }
+    stepLines.forEach(l => dhGroup.remove(l));
+    stepLines = [];
+  }
+}
+
+// ============================================================
+// AUTO ROTATE
+// ============================================================
+window.toggleAutoRotate = function() {
+  autoRotate = !autoRotate;
+  document.getElementById('autoRotateBtn').textContent = autoRotate ? '⏸ 暂停' : '▶ 自动旋转';
+  if (autoRotate) autoRotateTime = 0;
+}
+
+// ============================================================
+// ROTATION MODE
+// ============================================================
+window.toggleRotMode = function() {
+  rotMode = rotMode === 'fixed' ? 'euler' : 'fixed';
+  const lang = currentLang;
+  document.getElementById('rotModeBtn').textContent = rotMode === 'fixed' ? i18n[lang].rotModeFixed : i18n[lang].rotModeEuler;
+  updateSpaceScene();
+}
+
+window.resetRotation = function() {
+  document.getElementById('rotX').value = 0;
+  document.getElementById('rotY').value = 0;
+  document.getElementById('rotZ').value = 0;
+  updateSpaceScene();
+}
+
+// ============================================================
+// LANGUAGE
+// ============================================================
+window.setLanguage = function(lang) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+  const t = i18n[lang];
+  document.getElementById('panelTitle').textContent = t.panelTitle;
+  document.getElementById('statusBar').textContent = t.statusBar;
+  document.getElementById('spaceInfo').textContent = t.spaceInfo;
+  document.getElementById('dhInfo').textContent = t.dhInfo;
+  document.querySelectorAll('.tab-btn')[0].textContent = t.spaceTab;
+  document.querySelectorAll('.tab-btn')[1].textContent = t.dhTab;
+  document.getElementById('rotModeBtn').textContent = rotMode === 'fixed' ? t.rotModeFixed : t.rotModeEuler;
+  updateStepUI();
+};
+
+// ============================================================
+// GUIDE OVERLAY
+// ============================================================
+window.closeGuide = function() {
+  document.getElementById('guide-overlay').classList.add('hidden');
+};
+
+// ============================================================
+// SLIDER BINDINGS
+// ============================================================
+function bindSliders() {
+  const sliders = ['pointX', 'pointY', 'pointZ', 'rotX', 'rotY', 'rotZ'];
+  sliders.forEach(id => {
+    document.getElementById(id).addEventListener('input', () => updateSpaceScene());
+  });
+
+  const dhSliders = ['joint1', 'joint2', 'linkLen1', 'linkLen2', 'linkOff1'];
+  dhSliders.forEach(id => {
+    document.getElementById(id).addEventListener('input', () => updateDHScene());
+  });
+}
+
+// ============================================================
+// RESIZE
+// ============================================================
+function onResize() {
+  const container = document.getElementById('canvas-container');
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+
+// ============================================================
+// STATUS BAR
+// ============================================================
+function updateStatusBar() {
+  const lang = currentLang;
+  document.getElementById('statusBar').textContent = lang === 'zh'
+    ? (currentTab === 'space' ? '空间描述 · 拖拽旋转 · 滚轮缩放' : '连杆坐标系 · 拖拽旋转 · 滚轮缩放')
+    : (currentTab === 'space' ? 'Space & Transform · Drag to rotate' : 'DH Coordinates · Drag to rotate');
+}
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+function animate() {
+  animFrame = requestAnimationFrame(animate);
+
+  if (autoRotate) {
+    autoRotateTime += 0.02;
+    const angle = Math.sin(autoRotateTime) * 60 * DEG;
+    document.getElementById('joint1').value = (Math.sin(autoRotateTime) * 60).toFixed(0);
+    document.getElementById('joint2').value = (Math.cos(autoRotateTime * 0.7) * 45).toFixed(0);
+    updateDHScene();
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+// START
+// ============================================================
+init();
+updateSpaceScene();
+updateDHScene();
+updateStepUI();
+
+</script>
+</body>
+</html>
